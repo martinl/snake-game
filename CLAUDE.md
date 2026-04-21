@@ -4,7 +4,7 @@ Nokia-style Snake as an installable PWA with a global Supabase leaderboard. Stat
 
 ## Status
 
-Greenfield. Only [ARCHITECTURE.md](ARCHITECTURE.md), [README.md](README.md), and [LICENSE](LICENSE) exist. No `src/`, `package.json`, or Supabase project yet. Scaffolding happens in M1 ([ARCHITECTURE.md:388](ARCHITECTURE.md#L388)).
+**M1 landed (2026-04-21):** playable Snake in browser, keyboard only, local hi-score in `localStorage`. No mobile controls, PWA, or backend yet — those are M2–M7 ([ARCHITECTURE.md:388](ARCHITECTURE.md#L388)). Node toolchain is via `nvm` (Node 24.15 installed); source nvm before running scripts: `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`.
 
 ## Stack
 
@@ -12,20 +12,30 @@ Greenfield. Only [ARCHITECTURE.md](ARCHITECTURE.md), [README.md](README.md), and
 - **Backend:** Supabase free tier — Postgres + PostgREST auto-API + one RPC (`submit_score`). Anonymous access, security via RLS.
 - **CI/Hosting:** GitHub Actions → `gh-pages` branch → GitHub Pages. Keep-warm cron every 6h to avoid the 7-day Supabase pause ([ARCHITECTURE.md:74-92](ARCHITECTURE.md#L74-L92)).
 
-## Layout (planned — see [ARCHITECTURE.md:96-121](ARCHITECTURE.md#L96-L121))
+## Layout (current; see [ARCHITECTURE.md:96-121](ARCHITECTURE.md#L96-L121) for the full plan)
 
 ```
 src/
-  main.ts
-  game/      engine, state, rules, renderer
-  input/     keyboard, touch
-  ui/        hud, menu, nameEntry
-  net/       supabase, leaderboard
-  pwa/       register
-supabase/migrations/   # SQL only; apply via supabase CLI
-public/                # icons, manifest.json, favicon
-.github/workflows/deploy.yml
+  main.ts              # wiring
+  game/
+    state.ts           # types, constants, initial state, food spawn
+    rules.ts           # tick(), bufferDirection()
+    engine.ts          # rAF loop, fixed-timestep sim
+    renderer.ts        # canvas draw
+  input/
+    keyboard.ts        # arrow keys + WASD + space/enter
+  ui/
+    hud.ts             # score, hi-score, overlay
+  styles.css
+# not yet created: input/touch.ts, ui/menu.ts, ui/nameEntry.ts, net/*, pwa/*, supabase/, .github/
 ```
+
+### M1 constants (locked)
+
+- Grid 24×18, canvas 480×360 (20px cells).
+- Tick starts at 160ms, floor 60ms, multiplied by 0.96 per food eaten.
+- Wall collision = game over. No wrap.
+- Local hi-score key: `snake.hiscore.v1`.
 
 ## Conventions worth keeping straight
 
@@ -40,15 +50,16 @@ public/                # icons, manifest.json, favicon
 
 ## Open decisions (don't invent answers — ask)
 
-Visual style, grid size, speed curve, wall vs. wrap, 3-char vs. free-form name entry, leaderboard splits. Full list at [ARCHITECTURE.md:403-412](ARCHITECTURE.md#L403-L412). If a task depends on one of these, surface the question rather than picking silently.
+Resolved: visual style, grid size, speed curve, wall behavior (see [ARCHITECTURE.md §13](ARCHITECTURE.md#L403-L412)). Still open: name-entry format (M5/M6) and leaderboard splits (M5). If a task depends on one of these, surface the question rather than picking silently.
 
 ## Explicit non-goals
 
 Multiplayer, accounts with email/password, App/Play Store builds, cosmetic skins, ads/analytics, anti-cheat beyond basic sanity checks. See [ARCHITECTURE.md:376-383](ARCHITECTURE.md#L376-L383) before proposing scope that touches these.
 
-## Commands (once scaffolded — not yet wired)
+## Commands
 
-- `npm run dev` — Vite dev server
+- `npm run dev` — Vite dev server on `http://localhost:5173`
 - `npm run build` — production bundle into `dist/`
 - `npm run preview` — serve built bundle locally
-- Supabase migrations live in `supabase/migrations/` and are applied via the Supabase CLI.
+- `npm run typecheck` — `tsc --noEmit`
+- Supabase migrations will live in `supabase/migrations/` and are applied via the Supabase CLI (not yet created).

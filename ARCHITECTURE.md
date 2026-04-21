@@ -469,14 +469,17 @@ Total: realistically ~1 week of evenings for a working, polished v1.
 
 ## 13. Open Decisions
 
-Things worth pinning down before or during M1:
+**Resolved for M1 (2026-04-21):**
 
-- **Visual style.** Authentic Nokia 3310 green LCD, or modernized pixel art?
-- **Grid size.** Classic 16×12 or something chunkier like 24×18?
-- **Speed curve.** Fixed speed per game, or accelerates as snake grows (classic Nokia behavior)?
-- **Wall behavior.** Die on wall collision (classic), or wrap around (common modern variant)?
-- **Name entry.** Classic 3-character initials, or free-form up to 16 chars?
-- **Leaderboards.** One global, or split by speed preset / daily / weekly?
+- **Visual style:** Authentic Nokia 3310 green LCD (`#9ebd8a` background, `#0e240e` pixels).
+- **Grid size:** 24×18 (480×360 canvas at 20px cells).
+- **Speed curve:** Accelerates as snake grows (classic Nokia behavior).
+- **Wall behavior:** Die on wall collision (classic).
+
+**Still open (defer to later milestones):**
+
+- **Name entry.** Classic 3-character initials, or free-form up to 16 chars? (M5/M6.)
+- **Leaderboards.** One global, or split by speed preset / daily / weekly? (M5.)
 
 ---
 
