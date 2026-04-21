@@ -268,6 +268,56 @@ Accept that #1–#3 will eventually be broken by someone with an afternoon. That
 
 ---
 
+## 7a. Security Requirements
+
+Anti-cheat (§7) is about score integrity. This section is about the usual web-security hygiene: treating input as hostile, keeping SQL parameterized, and catching vulnerable dependencies before they reach `main`.
+
+### Untrusted input
+
+"Untrusted" means anything that crossed a trust boundary:
+- User input (name entry, settings).
+- Anything from the network (Supabase responses, cached leaderboard JSON from `localStorage`/`IndexedDB`).
+- URL state (query string, hash, deep links).
+- Clipboard content if we ever paste.
+- Service-worker cached data (it was network-sourced at some point).
+
+**Rules:**
+
+1. **Validate at the boundary, then trust downstream.** The boundary is the RPC (server side) and the input handler / fetch parser (client side). Past that point, code may assume the shape.
+2. **Display names:** regex-validated on both sides — client for UX feedback, server in `submit_score` for enforcement (`^[A-Za-z0-9_\- ]{1,16}$`, see §6). Server is source of truth.
+3. **Never `innerHTML` untrusted strings.** Use `textContent` or explicit sanitization. The leaderboard renders display names — these are attacker-controlled. A name like `<img src=x onerror=...>` must render as literal text, not as HTML.
+4. **JSON from storage is untrusted.** When hydrating cached leaderboard entries from `localStorage` or `IndexedDB`, validate shape before use — an attacker with XSS elsewhere (or a previous bad cache version) can have written anything there.
+5. **No `eval` / `new Function` / dynamic `import()` of user strings.** Ever.
+6. **Numeric inputs:** coerce and range-check (`Number.isFinite`, min/max) at the boundary. Don't trust that "it's a number because the form said so."
+7. **Log defensively.** Never log full request bodies, names, or IP addresses to the browser console or to CI output where they'd be indexed.
+
+### SQL injection
+
+Current posture: **safe by construction** — client never writes SQL, it calls the `submit_score` RPC (§6) with typed parameters. `supabase-js` uses PostgREST which parameterizes. The RPC itself uses static SQL (`insert … values ($1, $2, …)`), no `EXECUTE`.
+
+**Rules to keep it that way:**
+
+1. **No string-built SQL in plpgsql.** If a future function needs dynamic SQL, use `EXECUTE … USING` with placeholders, or `format(..., %L)` for literals and `%I` for identifiers — never `%s`.
+2. **Never pass raw input to `EXECUTE`.** If you find yourself writing `EXECUTE 'select … ' || p_name`, stop. That's an injection.
+3. **PostgREST filter strings are safe** for `eq`, `ilike`, etc. with user values, because supabase-js sends them as bound parameters. But **do not** build raw `or(…)` filter expressions from user input — those parse client-side strings into filter ASTs and can be abused. If we ever need dynamic filters, whitelist columns/operators.
+4. **Edge Functions (when/if added):** use the Supabase service-role client with parameterized queries only. Never concatenate.
+5. **Migrations are reviewed.** Anyone touching `supabase/migrations/*.sql` triggers a SQL review in the PR — same as prod code.
+
+### Dependency & secret scanning
+
+Run Trivy on every pull request. It catches:
+- Known CVEs in npm dependencies (via `package-lock.json`).
+- Misconfigurations in any Dockerfiles / GH Actions workflows we add.
+- Leaked secrets (private keys, provider tokens) accidentally committed.
+
+**Policy:**
+- **HIGH and CRITICAL** findings fail the PR check.
+- **MEDIUM and below** are reported but don't block.
+- False positives are suppressed via `.trivyignore` with a dated comment explaining why.
+- The scan runs on `pull_request` events only (not on `push` to `main`, since blocking merges has already happened). Fast: ~30s on a repo this size.
+
+---
+
 ## 8. PWA Specifics
 
 ### Manifest (`manifest.json`)
@@ -308,12 +358,29 @@ Install prompt API works. Fire `beforeinstallprompt` → show a custom "Install"
 ### GitHub Actions workflow (`.github/workflows/deploy.yml`)
 
 ```yaml
-name: Deploy
+name: CI/CD
 on:
   push: { branches: [main] }
+  pull_request: { branches: [main] }
   schedule: [{ cron: '0 */6 * * *' }]  # keep-warm ping
 
 jobs:
+  security-scan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          scanners: vuln,secret,misconfig
+          trivyignores: .trivyignore
+
   build-and-deploy:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
