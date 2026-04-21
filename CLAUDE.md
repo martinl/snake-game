@@ -4,7 +4,7 @@ Nokia-style Snake as an installable PWA with a global Supabase leaderboard. Stat
 
 ## Status
 
-**M1 landed (2026-04-21):** playable Snake in browser, keyboard only, local hi-score in `localStorage`. No mobile controls, PWA, or backend yet — those are M2–M7 ([ARCHITECTURE.md:388](ARCHITECTURE.md#L388)). Node toolchain is via `nvm` (Node 24.15 installed); source nvm before running scripts: `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`.
+**M1–M2 landed (2026-04-21):** playable Snake in browser with keyboard + swipe controls, responsive LCD panel, iOS viewport quirks handled (`dvh`, `safe-area-inset-*`, `apple-mobile-web-app-*` meta tags), local hi-score in `localStorage`. No PWA or backend yet — those are M3–M7 ([ARCHITECTURE.md:388](ARCHITECTURE.md#L388)). Node toolchain is via `nvm` (Node 24.15 installed); source nvm before running scripts: `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`.
 
 ## Stack
 
@@ -24,10 +24,12 @@ src/
     renderer.ts        # canvas draw
   input/
     keyboard.ts        # arrow keys + WASD + space/enter
+    touch.ts           # swipe gestures (20px threshold), tap-to-start
   ui/
     hud.ts             # score, hi-score, overlay
   styles.css
-# not yet created: input/touch.ts, ui/menu.ts, ui/nameEntry.ts, net/*, pwa/*, supabase/, .github/
+# not yet created: ui/menu.ts, ui/nameEntry.ts, net/*, pwa/*, supabase/
+.github/workflows/deploy.yml  # Pages deploy (push to main) + Trivy + build-check (PR)
 ```
 
 ### M1 constants (locked)
@@ -36,6 +38,7 @@ src/
 - Tick starts at 160ms, floor 60ms, multiplied by 0.96 per food eaten.
 - Wall collision = game over. No wrap.
 - Local hi-score key: `snake.hiscore.v1`.
+- Swipe threshold: 20px. A single swipe can register multiple direction changes (origin resets after each fire).
 
 ## Conventions worth keeping straight
 
